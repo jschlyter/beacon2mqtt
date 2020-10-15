@@ -86,11 +86,10 @@ def main():
     client = mqtt.Client()
 
     logging.info("Trying to connect to MQTT broker %s", args.mqtt_broker)
-    client.connect(args.mqtt_broker)
-    logging.info("Connected to MQTT broker %s", args.mqtt_broker)
-
     client.will_set(availability_topic, "DISCONNECTED", retain=False)
+    client.connect(args.mqtt_broker)
     client.publish(availability_topic, "CONNECTED", retain=False)
+    logging.info("Connected to MQTT broker %s", args.mqtt_broker)
 
     callback = generate_callback(beacons=beacons, client=client, topic=devices_topic)
     scanner = BeaconScanner(callback, packet_filter=IBeaconAdvertisement)
