@@ -76,8 +76,11 @@ def main():
     )
     args = parser.parse_args()
 
-    if args.debug:
-        logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)-8s %(message)s",
+        level=logging.DEBUG if args.debug else logging.INFO,
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     availability_topic = f"{args.mqtt_topic}/scanner/{args.room}"
     devices_topic = f"{args.mqtt_topic}/devices/{args.room}"
