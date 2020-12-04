@@ -20,17 +20,18 @@ def generate_callback(beacons: ExpiringDict, client: mqtt.Client, topic: str):
         beacons[packet.uuid] = True
         payload = {
             "id": packet.uuid,
-            "timestamp": int(time.time()),
-            "rssi": rssi,
-            "uuid": packet.uuid,
-            "major": packet.major,
-            "minor": packet.minor,
-            "tx_power": packet.tx_power,
+            "distance": abs(rssi),
+            # "timestamp": int(time.time()),
+            # "rssi": rssi,
+            # "uuid": packet.uuid,
+            # "major": packet.major,
+            # "minor": packet.minor,
+            # "tx_power": packet.tx_power,
         }
         mqtt_payload = json.dumps(payload)
-        mqtt_topic = f"{topic}/{packet.uuid}"
-        client.publish(mqtt_topic, mqtt_payload)
-        logging.debug("MQTT publish on %s: %s", mqtt_topic, mqtt_payload)
+        mqtt_topic = topic
+        res = client.publish(mqtt_topic, mqtt_payload)
+        logging.info("MQTT publish (%d) on %s: %s", res.rc, mqtt_topic, mqtt_payload)
 
     return callback
 
