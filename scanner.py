@@ -4,36 +4,46 @@ import argparse
 import json
 import logging
 import time
+from functools import partial
 
 import paho.mqtt.client as mqtt
 from beacontools import BeaconScanner, IBeaconAdvertisement, IBeaconFilter
 from expiringdict import ExpiringDict
 
 
-def generate_callback(beacons: ExpiringDict, client: mqtt.Client, topic: str):
-    """Generate callback function"""
+def beacon_callback(
+    bt_addr,
+    rssi,
+    packet,
+    additional_info,
+    beacons: ExpiringDict,
+    client: mqtt.Client,
+    topic: str,
+):
+    if packet.uuid in beacons:
+        logging.debug("Skip MQTT publish for %s", packet.uuid)
+        return
+    beacons[packet.uuid] = True
+    payload = {
+        "id": packet.uuid,
+        "distance": abs(rssi),
+        "t": int(time.time()),
+        # "rssi": rssi,
+        # "uuid": packet.uuid,
+        # "major": packet.major,
+        # "minor": packet.minor,
+        # "tx_power": packet.tx_power,
+    }
+    mqtt_payload = json.dumps(payload)
+    mqtt_topic = topic
+    res = client.publish(mqtt_topic, mqtt_payload)
+    logging.info("MQTT publish (%d) on %s: %s", res.rc, mqtt_topic, mqtt_payload)
 
-    def callback(bt_addr, rssi, packet, additional_info):
-        if packet.uuid in beacons:
-            logging.debug("Skip MQTT publish for %s", packet.uuid)
-            return
-        beacons[packet.uuid] = True
-        payload = {
-            "id": packet.uuid,
-            "distance": abs(rssi),
-            # "timestamp": int(time.time()),
-            # "rssi": rssi,
-            # "uuid": packet.uuid,
-            # "major": packet.major,
-            # "minor": packet.minor,
-            # "tx_power": packet.tx_power,
-        }
-        mqtt_payload = json.dumps(payload)
-        mqtt_topic = topic
-        res = client.publish(mqtt_topic, mqtt_payload)
-        logging.info("MQTT publish (%d) on %s: %s", res.rc, mqtt_topic, mqtt_payload)
 
-    return callback
+def on_disconnect(client, userdata, rc):
+    if rc != mqtt.MQTT_ERR_SUCCESS:
+        logging.warning("Disconnected, reconnecting to MQTT broker")
+        client.reconnect()
 
 
 def main():
@@ -91,11 +101,14 @@ def main():
 
     logging.info("Trying to connect to MQTT broker %s", args.mqtt_broker)
     client.will_set(availability_topic, "DISCONNECTED", retain=False)
+    client.on_disconnect = on_disconnect
     client.connect(args.mqtt_broker)
     client.publish(availability_topic, "CONNECTED", retain=False)
     logging.info("Connected to MQTT broker %s", args.mqtt_broker)
 
-    callback = generate_callback(beacons=beacons, client=client, topic=devices_topic)
+    callback = partial(
+        beacon_callback, beacons=beacons, client=client, topic=devices_topic
+    )
     scanner = BeaconScanner(callback, packet_filter=IBeaconAdvertisement)
     scanner.start()
 
