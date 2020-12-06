@@ -1,4 +1,4 @@
-"""iBeacon to MQTT bridge"""
+"""BLE beacon to MQTT bridge"""
 
 import argparse
 import json
